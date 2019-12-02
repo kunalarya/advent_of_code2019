@@ -39,7 +39,7 @@ fn main() {
     println!("Loaded {} numbers.", numbers.len());
 
     // Compute and print the result:
-    let total_fuel_required = numbers
+    let total_fuel_required: FuelType = numbers
         .iter()
         .map(|mass| {
             if calculate_fuel_mass {
@@ -48,7 +48,7 @@ fn main() {
                 fuel_required(*mass)
             }
         })
-        .fold(0, |s, i| s + i);
+        .sum();
     println!("Total fuel required: {}", total_fuel_required);
 }
 
