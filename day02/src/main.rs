@@ -15,15 +15,18 @@ fn main() -> Res<()> {
                 .required(true)
                 .index(1),
         )
+        .arg(Arg::with_name("target").help("Set the target output of the given program."))
         .get_matches();
 
     let filename = args.value_of("INPUT").unwrap();
+    let target_output_opt: Option<IntCode> = args
+        .value_of("target")
+        .map(|target_str| target_str.parse::<IntCode>().unwrap());
 
     // Load and parse list of numbers.
-    let contents =
-        fs::read_to_string(filename).expect(&format!("IO error reading file: {:?}", filename));
+    let contents = fs::read_to_string(filename)?;
 
-    let mut intcodes: Vec<IntCode> = {
+    let intcodes: Vec<IntCode> = {
         let mut intcodes: Vec<IntCode> = vec![];
         for (index, line) in contents.trim().split(",").enumerate() {
             if let Ok(parsed) = line.parse::<IntCode>() {
@@ -38,12 +41,31 @@ fn main() -> Res<()> {
     println!("Loaded {} intcodes.", intcodes.len());
 
     // Replace values for 1202 state:
-    intcodes[1] = 12;
-    intcodes[2] = 2;
+    if let Some(target_output) = target_output_opt {
+        for noun in 0..99 {
+            for verb in 0..99 {
+                let mut intcodes = intcodes.clone();
+                intcodes[1] = noun;
+                intcodes[2] = verb;
 
-    run(&mut intcodes)?;
+                run(&mut intcodes)?;
 
-    println!("Value at position 0: {}", intcodes[0]);
+                let result = intcodes[0];
+                if result == target_output {
+                    println!("match: noun={} verb={}", noun, verb);
+                    println!("       100 * noun + verb={}", 100 * noun + verb);
+                }
+            }
+        }
+    } else {
+        let mut intcodes = intcodes.clone();
+        println!("Assuming 1202 output.");
+        intcodes[1] = 12;
+        intcodes[2] = 2;
+
+        run(&mut intcodes)?;
+        println!("result: {}", intcodes[0]);
+    }
 
     Ok(())
 }
