@@ -71,8 +71,11 @@ fn main() -> Res<()> {
     let intersections = all_intersections(&wires);
     println!("Intersections: {:?}", intersections);
 
-    let closest = closest_intersection(&intersections);
-    println!("closest intersection manhattan dist: {}", closest);
+    let closest_dist = closest_intersection(&intersections);
+    println!("closest intersection manhattan dist: {}", closest_dist);
+
+    let closest_by_wire_length = closest_length(&wires, &intersections);
+    println!("closest by wire length: {}", closest_by_wire_length);
 
     Ok(())
 }
@@ -91,9 +94,9 @@ fn parse_wires<S: Into<String>>(contents: S) -> Res<Vec<Vec<Span>>> {
     Ok(wires)
 }
 
-fn get_positions(wire: &Vec<Span>) -> HashSet<Position> {
+fn get_positions(wire: &Vec<Span>) -> Vec<Position> {
     // Create a set of all positions "visited" by the wire.
-    let mut position_set: HashSet<Position> = HashSet::new();
+    let mut positions = vec![];
     let mut current_position: Position = (0, 0);
     for span in wire {
         for _ in 0..span.dist {
@@ -103,22 +106,26 @@ fn get_positions(wire: &Vec<Span>) -> HashSet<Position> {
                 Direction::Right => (current_position.0 + 1, current_position.1),
                 Direction::Left => (current_position.0 - 1, current_position.1),
             };
-            position_set.insert(new_position);
+            positions.push(new_position);
             current_position = new_position;
         }
     }
-    position_set
+    positions
+}
+
+fn get_positions_set(wire: &Vec<Span>) -> HashSet<Position> {
+    get_positions(wire).into_iter().collect()
 }
 
 fn all_intersections(wires: &Vec<Vec<Span>>) -> HashSet<Position> {
-    let sets: Vec<HashSet<Position>> = wires.iter().map(|wire| get_positions(&wire)).collect();
+    let sets: Vec<HashSet<Position>> = wires.iter().map(|wire| get_positions_set(&wire)).collect();
 
     // Now determine all common points in the sets.
     let mut common_values = sets[0].clone();
     for other in &sets[1..] {
         common_values = common_values
             .intersection(other)
-            .map(|item| *item)
+            .map(|item| *item) // TODO: Why doesn't into_iter work here?
             .collect();
     }
 
@@ -126,7 +133,46 @@ fn all_intersections(wires: &Vec<Vec<Span>>) -> HashSet<Position> {
 }
 
 fn closest_intersection(positions: &HashSet<Position>) -> i32 {
-    positions.iter().map(|(x, y)| x.abs() + y.abs()).min().unwrap()
+    let mut min: i32 = std::i32::MAX;
+    for pos in positions {
+        let dist = manhattan_dist(pos);
+        if dist < min {
+            min = dist;
+        }
+    }
+    min
+}
+
+fn manhattan_dist(position: &Position) -> i32 {
+    let (x, y) = position;
+    x.abs() + y.abs()
+}
+
+// Compute the shortest wire length for the given intersection.
+fn closest_length(wires: &Vec<Vec<Span>>, positions: &HashSet<Position>) -> i32 {
+    // Now do the same but based on wire length.
+    let mut min: i32 = std::i32::MAX;
+
+    for pos in positions {
+        let mut dist: i32 = 0;
+        // for each wire, compute the distance to the intersection points. we'll store those.
+        for (index, wire) in wires.iter().enumerate() {
+            let wire_pos = get_positions(&wire);
+            println!("wire #{} has length {}", index, wire_pos.len());
+
+            // Find the closest intersection distance.
+            if let Some(m) = wire_pos.iter().position(|&item| item == *pos) {
+                let m = m + 1; // Account for zero index.
+                println!("Wire #{}: dist to {:?}: {:?}", index, pos, m);
+                dist += m as i32;
+            }
+        }
+        if dist < min {
+            min = dist;
+        }
+    }
+
+    min
 }
 
 #[cfg(test)]
@@ -169,7 +215,7 @@ mod test {
             direction: Direction::Up,
             dist: 3,
         }];
-        let positions = get_positions(&wire);
+        let positions = get_positions_set(&wire);
         let expected: HashSet<Position> = vec![(0, -1), (0, -2), (0, -3)].into_iter().collect();
 
         assert_eq!(positions, expected);
@@ -182,7 +228,7 @@ mod test {
             dist: 3,
         }];
         let positions = get_positions(&wire);
-        let expected: HashSet<Position> = vec![(0, 1), (0, 2), (0, 3)].into_iter().collect();
+        let expected = vec![(0, 1), (0, 2), (0, 3)];
 
         assert_eq!(positions, expected);
         Ok(())
@@ -194,7 +240,7 @@ mod test {
             dist: 3,
         }];
         let positions = get_positions(&wire);
-        let expected: HashSet<Position> = vec![(-1, 0), (-2, 0), (-3, 0)].into_iter().collect();
+        let expected = vec![(-1, 0), (-2, 0), (-3, 0)];
 
         assert_eq!(positions, expected);
         Ok(())
@@ -206,7 +252,7 @@ mod test {
             dist: 3,
         }];
         let positions = get_positions(&wire);
-        let expected: HashSet<Position> = vec![(1, 0), (2, 0), (3, 0)].into_iter().collect();
+        let expected = vec![(1, 0), (2, 0), (3, 0)];
 
         assert_eq!(positions, expected);
         Ok(())
@@ -224,9 +270,7 @@ mod test {
             },
         ];
         let positions = get_positions(&wire);
-        let expected: HashSet<Position> = vec![(1, 0), (2, 0), (3, 0), (3, -1), (3, -2)]
-            .into_iter()
-            .collect();
+        let expected = vec![(1, 0), (2, 0), (3, 0), (3, -1), (3, -2)];
 
         assert_eq!(positions, expected);
         Ok(())
@@ -243,7 +287,8 @@ mod test {
     #[test]
     fn closest_intersection_1() -> Res<()> {
         let pos: HashSet<Position> = vec![(3, -3), (6, -5)].into_iter().collect();
-        assert_eq!(closest_intersection(&pos), 6);
+        let closest_dist = closest_intersection(&pos);
+        assert_eq!(closest_dist, 6);
         Ok(())
     }
     #[test]
@@ -252,6 +297,28 @@ mod test {
         let intersections = all_intersections(&wires);
         let expected: HashSet<Position> = vec![(3, -3), (6, -5)].into_iter().collect();
         assert_eq!(intersections, expected);
+        let closest_by_wire_length = closest_length(&wires, &intersections);
+        assert_eq!(closest_by_wire_length, 30);
+        Ok(())
+    }
+    #[test]
+    fn given_example_2() -> Res<()> {
+        let wires = parse_wires(
+            "R75,D30,R83,U83,L12,D49,R71,U7,L72\nU62,R66,U55,R34,D71,R55,D58,R83",
+        )?;
+        let intersections = all_intersections(&wires);
+        let closest_by_wire_length = closest_length(&wires, &intersections);
+        assert_eq!(closest_by_wire_length, 610);
+        Ok(())
+    }
+    #[test]
+    fn given_example_3() -> Res<()> {
+        let wires = parse_wires(
+            "R98,U47,R26,D63,R33,U87,L62,D20,R33,U53,R51\nU98,R91,D20,R16,D67,R40,U7,R15,U6,R7",
+        )?;
+        let intersections = all_intersections(&wires);
+        let closest_by_wire_length = closest_length(&wires, &intersections);
+        assert_eq!(closest_by_wire_length, 410);
         Ok(())
     }
 }
