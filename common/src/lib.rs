@@ -31,6 +31,6 @@ impl Error for GenericError {
     }
 }
 
-pub fn error<T>(msg: &str) -> Res<T> {
-    Err(Box::new(GenericError::new(msg)))
+pub fn error<T, S: Into<String>>(msg: S) -> Res<T> {
+    Err(Box::new(GenericError::new(&msg.into())))
 }

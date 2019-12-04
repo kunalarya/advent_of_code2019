@@ -90,7 +90,7 @@ fn run(mut intcodes: &mut Vec<IntCode>) -> Res<()> {
                 break;
             }
             _ => {
-                return error(&format!("Invalid opcode: {}", op_code));
+                return error(format!("Invalid opcode: {}", op_code));
             }
         }
         pc += 4;
@@ -103,16 +103,16 @@ fn get_operands_and_dst(intcodes: &mut Vec<IntCode>, pc: usize) -> Res<(IntCode,
     let src0_addr = intcodes[pc + 1] as usize;
     let src1_addr = intcodes[pc + 2] as usize;
     if src0_addr >= intcodes.len() {
-        return error(&format!("Invalid src address: {}", src0_addr));
+        return error(format!("Invalid src address: {}", src0_addr));
     }
     if src1_addr >= intcodes.len() {
-        return error(&format!("Invalid src address: {}", src1_addr));
+        return error(format!("Invalid src address: {}", src1_addr));
     }
     let src0 = intcodes[intcodes[pc + 1] as usize];
     let src1 = intcodes[intcodes[pc + 2] as usize];
     let dst_addr = intcodes[pc + 3] as usize;
     if dst_addr >= intcodes.len() {
-        return error(&format!("Invalid dest address: {}", dst_addr));
+        return error(format!("Invalid dest address: {}", dst_addr));
     }
     Ok((src0, src1, dst_addr))
 }
